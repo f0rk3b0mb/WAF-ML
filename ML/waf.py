@@ -10,8 +10,7 @@ import pickle
 import html
 import joblib
 
-from scapy.all import sniff, TCP, IP, Raw
-import urllib
+
 
 class WAF(object):
 
@@ -89,59 +88,19 @@ class WAF(object):
         return ngrams
 
 
-
-def extract_url(packet):
-    if packet.haslayer(Raw):  # Check if the packet has a payload
-        payload = packet[Raw].load.decode('utf-8', errors='ignore')
-
-        # Only consider HTTP GET requests
-        if payload.startswith('GET'):
-            # Split payload to get the request line (first line contains the URL)
-            request_line = payload.split('\n')[0]
-            # Extract the URL from the request line
-            url = request_line.split(' ')[1]
-            print(f"Extracted URL: {url}")
-            return url
-    return None
-
-def handle_packet(packet):
-    if packet.haslayer(TCP) and packet.haslayer(IP):
-        source_ip = packet[IP].src
-        destination_ip = packet[IP].dst
-        url = extract_url(packet)
-        
-        if url:
-            # Make prediction using your WAF's ML model
-            result = w.predict([url])
-            if result[0]['res'] == 'Malicious request':
-                print(f"Blocked malicious URL: {url} from {source_ip}")
-                # Here you could implement logic to block the IP or drop the packet
-            else:
-                print(f"Allowed URL: {url} from {source_ip}")
-                # Let the packet pass or forward it to the destination
-        else:
-            # Not an HTTP GET request or no URL found
-            pass
+######################################################################
 
 
 
 
-if __name__ == '__main__':
+
+
+#if __name__ == '__main__':
 #    # If the detection model file 'lgs.pickle' does not exist, train the model first
 #    #w = WAF()
 #    #with open('lgs.pickle','wb') as output:
 #    #    joblib.dump(w, 'lgs.pickle')
-#
-    with open('lgs.pickle','rb') as input:
-        w = joblib.load('lgs.pickle')
-    
-    # Start sniffing HTTP traffic (port 80)
-    sniff(filter="tcp port 80", prn=handle_packet, store=0,iface="lo")
-
-
-
-
-    
+#   
 #
 #    # Example predictions on new queries
 #    w.predict(['www.foo.com/id=1<script>alert(1)</script>',
