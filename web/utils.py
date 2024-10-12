@@ -10,66 +10,9 @@ import pyotp
 
 
 # encryptor
-# Generate a random encryption key (you should keep this key secret)
 #SECRET_KEY = Fernet.generate_key()
 SECRET_KEY = "oGSklXeLBa-OxD4_HQ0yqnlhesuWA1UgTtp1VBDFA1Y="
 cipher_suite = Fernet(SECRET_KEY)
-
-def encrypt_file(file_path):
-    try:
-        with open(file_path, 'rb') as file:
-            file_data = file.read()
-            encrypted_data = cipher_suite.encrypt(file_data)
-
-        # Save the encrypted data back to the file
-        with open(file_path, 'wb') as encrypted_file:
-            encrypted_file.write(encrypted_data)
-
-        return True, "File encrypted successfully"
-    except Exception as e:
-        return False, str(e)
-
-
-
-# decryptor
-
-def decrypt_file(file_path):
-    try:
-        with open(file_path, 'rb') as encrypted_file:
-            encrypted_data = encrypted_file.read()
-            decrypted_data = cipher_suite.decrypt(encrypted_data)
-
-        # Create a BytesIO object with the decrypted data
-        decrypted_io = BytesIO(decrypted_data)
-
-        # Create a Flask response with the decrypted data as content
-        response = make_response(decrypted_io.getvalue())
-
-        # Set appropriate headers for the response
-        response.headers['Content-Type'] = 'application/octet-stream'
-        response.headers['Content-Disposition'] = f'attachment; filename={os.path.basename(file_path)}'
-
-        return True, response
-    except Exception as e:
-        return False, str(e)
-
-# integrity checking
-
-
-
-def calculate_sha256(file_path):
-    sha256_hash = hashlib.sha256()
-    with open(file_path, 'rb') as f:
-        while True:
-            data = f.read(65536)  # Read in 64 KB chunks
-            if not data:
-                break
-            sha256_hash.update(data)
-    return sha256_hash.hexdigest()
-
-
-# backup
-
 
 #login check
 
@@ -112,3 +55,6 @@ def generate_otp():
     otp_code = totp.now()
 
     return otp_code
+
+
+

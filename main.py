@@ -2,7 +2,9 @@ from scapy.all import sniff, TCP, IP, Raw
 import urllib
 import joblib
 from utils import block_ip
-from ML.waf import WAF 
+from ML.waf import WAF
+from database import log_request
+from web.main import app
 
 
 def extract_url(packet):
@@ -32,6 +34,7 @@ def handle_packet(packet):
         source_ip = packet[IP].src
         destination_ip = packet[IP].dst
         url = extract_url(packet)
+        log_request(source_ip, url)
 
         if url:
             try:
@@ -41,7 +44,6 @@ def handle_packet(packet):
                     print(f"Blocked malicious URL: {url} from {source_ip}")
                     # Implement logic to block the IP or drop the packet (optional)
                     block_ip(source_ip)
-                    return False
                 else:
                     print(f"Allowed URL: {url} from {source_ip}")
                     # Optionally log the allowed traffic for analysis
@@ -56,6 +58,10 @@ def handle_packet(packet):
 if __name__ == '__main__':
     with open('ML/lgs.pickle','rb') as input:
         w = joblib.load('ML/lgs.pickle')
+    print("Model loaded succesfully :)")
+    print("")
     
     # Start sniffing HTTP traffic (port 80)
-    sniff(filter="tcp port 80", prn=handle_packet, store=0,iface="lo")
+    sniff(filter="tcp port 80", prn=handle_packet, store=0,iface=['lo','wlp3s0'])
+    print("Waf listening on port 80 ...")
+

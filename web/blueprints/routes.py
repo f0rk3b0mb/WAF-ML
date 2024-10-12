@@ -1,10 +1,8 @@
 from flask import Blueprint, render_template, redirect, url_for, request, session ,jsonify , make_response
-import os
 from database import db, bcrypt , User 
-from utils import calculate_sha256, encrypt_file , decrypt_file , login_required , generate_otp, admin_required
+from web.utils import login_required , generate_otp, admin_required
 import datetime
-from  report_generator import generate_files_report, generate_users_report , generate_backups_report
-import subprocess
+
 
 web = Blueprint('web', __name__)
 api = Blueprint('api', __name__)
@@ -27,11 +25,6 @@ def before_request():
     if not session.get('user_id') and request.endpoint not in allowed_endpoints:
         return redirect(url_for('web.login'))
 
-@web.route("/dashboard")
-@login_required
-def dashboard():
-    return render_template("dashboard.html", username=session['username'])
-
 @web.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -42,22 +35,13 @@ def login():
         user = User.query.filter((User.username == email) | (User.email == email)).first()
 
         if user:
-            # Check if the user is approved
-            if user.is_approved == "True":
-                if bcrypt.check_password_hash(user.password, password):
-                    otp_code = generate_otp()
-                    user.otp = otp_code
-                    print(otp_code)
+            if bcrypt.check_password_hash(user.password, password):
                     db.session.commit()
                     session["user_id"] = user.id
                     session["username"] = user.username
-                    session["role"] = user.role_id
-                    if otp_code:
-                        return redirect(url_for("web.verify_otp"))
-                else:
-                    return render_template("login.html", message="Incorrect username or password")
+                    return redirect(url_for("web.dashboard"))
             else:
-                return render_template("login.html", message="Await admin approval")
+                    return render_template("login.html", message="Incorrect username or password")
         else:
             return render_template("login.html", message="Incorrect username or password")
 
@@ -89,8 +73,6 @@ def register():
         username = request.form.get("username")
         password = request.form.get("password")
         email = request.form.get("email")
-        role = request.form.get("role")
-
 
         #remove bad characters
         for i in ["{","}","(",")","<",">","/","\\"]:
@@ -105,14 +87,35 @@ def register():
         else:
             # Hash the password and create a new user
             hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
-            new_user = User(username=username, password=hashed_password , email=email, role_id=role, is_approved="False", date_registered=datetime.date.today())
+            new_user = User(username=username, password=hashed_password , email=email , date_registered=datetime.date.today())
             db.session.add(new_user)
             db.session.commit()
             return render_template("login.html", message="Await admin approval") # Redirect to the login route
 
     return render_template("register.html")
 
-    
+
+
+
+
+@web.route('/dashboard')
+@login_required
+def dashboard():
+    total_requests = get_total_requests()  # Fetch from logs or DB
+    blocked_requests = get_blocked_requests()  # Fetch from logs or DB
+    top_malicious_urls = get_top_malicious_urls()  # Most frequent URLs
+    recent_attacks = get_recent_attacks()  # Recent attack details
+
+    return render_template('dashboard.html', 
+                           total_requests=total_requests, 
+                           blocked_requests=blocked_requests,
+                           top_malicious_urls=top_malicious_urls,
+                           recent_attacks=recent_attacks)
+
+
+
+
+
 
 @web.route("/logout")
 def logout():
