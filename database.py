@@ -4,14 +4,10 @@ from sqlalchemy.orm import sessionmaker
 import datetime
 
 # Database connection
-DATABASE_URL = 'sqlite:///dbs/waf.db'  # Use your desired database URL
+DATABASE_URL = 'mysql+mysqlconnector://root:57071246@localhost/test'
 engine = create_engine(DATABASE_URL, echo=True)
 Base = declarative_base()
-
 Session = sessionmaker(bind=engine)
-
-# Create a new session
-session = Session()
 
 # Define the BlockedIP model
 class BlockedIP(Base):
@@ -22,19 +18,31 @@ class BlockedIP(Base):
 
     def __repr__(self):
         return f"<BlockedIP {self.ip_address}>"
-    
 
-
+# Define the RequestLog model
 class RequestLog(Base):
     __tablename__ = 'request_logs'
     id = Column(Integer, primary_key=True)
     ip_address = Column(String(50), nullable=False)
-    url = Column(String(50), nullable=False)
+    action = Column(String(50))
+    url = Column(String(50))
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
-    result = Column(String(50), nullable=False)  # Normal or Malicious
+    result = Column(String(50))  # Normal or Malicious
 
     def __repr__(self):
         return f"<RequestLog {self.url} from {self.ip_address}>"
+
+# Define the User model
+class User(Base):
+    __tablename__ = 'users'  # Ensure the table name is defined
+    id = Column(Integer, primary_key=True)
+    username = Column(String(50), unique=True, nullable=False)
+    password = Column(String(200), nullable=False)
+    email = Column(String(50))
+    date_registered = Column(DateTime, default=datetime.datetime.utcnow)  # Change to DateTime for consistency
+
+    def __repr__(self):
+        return f"<User {self.username}>"
 
 # Create the database and tables
 def init_db():
@@ -44,19 +52,51 @@ def init_db():
 # Function to add a blocked IP
 def add_blocked_ip(ip):
     session = Session()
-    new_block = BlockedIP(ip_address=ip)
-    session.add(new_block)
-    session.commit()
-    session.close()
-    print(f"Blocked IP {ip} added to the database.")
+    try:
+        new_block = BlockedIP(ip_address=ip)
+        session.add(new_block)
+        session.commit()
+        print(f"Blocked IP {ip} added to the database.")
+    except Exception as e:
+        session.rollback()  # Rollback in case of error
+        print(f"Error adding blocked IP {ip}: {e}")
+    finally:
+        session.close()
 
-def log_request(ip, url):
+# Function to log a request
+def log_request(ip, url, action):
     session = Session()
-    new_log = RequestLog(ip_address=ip, url=url)
-    session.add(new_log)
-    session.commit()
-    session.close()
-    print(f"Request logged: {url} from {ip}")
+    try:
+        new_log = RequestLog(ip_address=ip, url=url, action=action)
+        session.add(new_log)
+        session.commit()
+        print(f"Request logged: {url} from {ip}")
+    except Exception as e:
+        session.rollback()  # Rollback in case of error
+        print(f"Error logging request {url} from {ip}: {e}")
+    finally:
+        session.close()
+
+def add_default_record():
+    session = Session()
+    try:
+        # Create default user records
+        default_admin = User(username="admin", password="$2b$12$SUy7HGNzEen/MY.E9rKJpeqz9m5QldDSR0nWusFsolwORG51u98za", email="admin@admin.com")
+        session.add(default_admin)
+        
+        default_user = User(username="test", password="$2b$12$SUy7HGNzEen/MY.E9rKJpeqz9m5QldDSR0nWusFsolwORG51u98za", email="test@test.com")
+        session.add(default_user)
+        
+        session.commit()
+        print("Default users added to the database.")
+    except Exception as e:
+        session.rollback()  # Rollback in case of error
+        print(f"Error adding default users: {e}")
+    finally:
+        session.close()
+
 
 if __name__ == '__main__':
-    init_db()  # Initialize the database when the script runs
+    #Base.metadata.drop_all(engine)
+    init_db()
+    add_default_record() 

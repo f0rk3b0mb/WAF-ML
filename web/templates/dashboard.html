@@ -48,7 +48,7 @@
           {% for attack in recent_attacks %}
             <tr>
               <td>{{ attack.timestamp }}</td>
-              <td>{{ attack.source_ip }}</td>
+              <td>{{ attack.ip_address }}</td>
               <td>{{ attack.url }}</td>
               <td>{{ attack.attack_type }}</td>
               <td>{{ attack.action }}</td>

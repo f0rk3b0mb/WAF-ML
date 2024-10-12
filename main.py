@@ -4,7 +4,6 @@ import joblib
 from utils import block_ip
 from ML.waf import WAF
 from database import log_request
-from web.main import app
 
 
 def extract_url(packet):
@@ -34,7 +33,6 @@ def handle_packet(packet):
         source_ip = packet[IP].src
         destination_ip = packet[IP].dst
         url = extract_url(packet)
-        log_request(source_ip, url)
 
         if url:
             try:
@@ -44,9 +42,10 @@ def handle_packet(packet):
                     print(f"Blocked malicious URL: {url} from {source_ip}")
                     # Implement logic to block the IP or drop the packet (optional)
                     block_ip(source_ip)
+                    log_request(source_ip, url, result[0]['res'])
                 else:
                     print(f"Allowed URL: {url} from {source_ip}")
-                    # Optionally log the allowed traffic for analysis
+                    log_request(source_ip, url, result[0]['res'])
 
             except Exception as e:
                 print(f"Error during prediction: {e}")
@@ -60,8 +59,8 @@ if __name__ == '__main__':
         w = joblib.load('ML/lgs.pickle')
     print("Model loaded succesfully :)")
     print("")
+    print("Waf listening on port 80 ...")
     
     # Start sniffing HTTP traffic (port 80)
-    sniff(filter="tcp port 80", prn=handle_packet, store=0,iface=['lo','wlp3s0'])
-    print("Waf listening on port 80 ...")
+    sniff(filter="tcp port 80", prn=handle_packet, store=0,iface=['wlp3s0'])
 
