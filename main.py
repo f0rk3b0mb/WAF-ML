@@ -62,5 +62,5 @@ if __name__ == '__main__':
     print("Waf listening on port 80 ...")
     
     # Start sniffing HTTP traffic (port 80)
-    sniff(filter="tcp port 80", prn=handle_packet, store=0,iface=['wlp3s0'])
+    sniff(filter="tcp port 1234", prn=handle_packet, store=0,iface=['lo'])
 

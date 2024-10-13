@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
+import os
 
 # Database connection
 DATABASE_URL = 'mysql+mysqlconnector://root:57071246@localhost/test'
@@ -64,18 +65,35 @@ def add_blocked_ip(ip):
         session.close()
 
 # Function to log a request
-def log_request(ip, url, action):
-    session = Session()
+#def log_request(ip, url, action):
+#    session = Session()
+#    try:
+#        new_log = RequestLog(ip_address=ip, url=url, action=action)
+#        session.add(new_log)
+#        session.commit()
+#        print(f"Request logged: {url} from {ip}")
+#    except Exception as e:
+#        session.rollback()  # Rollback in case of error
+#        print(f"Error logging request {url} from {ip}: {e}")
+#    finally:
+#        session.close()
+
+def log_request(ip, url, action): # log requests to a file instead of database
     try:
-        new_log = RequestLog(ip_address=ip, url=url, action=action)
-        session.add(new_log)
-        session.commit()
-        print(f"Request logged: {url} from {ip}")
+        os.mkdir("./logs")
+        open("logs/access_logs.csv", "x").close()
+    except:
+        print("")
+    try:
+        with open("logs/access_logs.csv", "a") as f:
+            log= str(datetime.datetime.now()) + "  ,  " + str(ip) + "  ,  "+ str(url) +"  ,  "+ str(action) + "\n"
+            f.write(log)
+            print(log.strip(","))
+            f.close()
     except Exception as e:
-        session.rollback()  # Rollback in case of error
-        print(f"Error logging request {url} from {ip}: {e}")
-    finally:
-        session.close()
+        print(e)
+
+
 
 def add_default_record():
     session = Session()

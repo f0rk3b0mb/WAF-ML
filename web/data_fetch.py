@@ -11,7 +11,7 @@ def get_blocked_requests():
         blocked_requests = db.query(RequestLog).filter_by(action='Malicious request').count()
         return blocked_requests
 
-def get_top_malicious_urls(limit=5):
+def get_top_malicious_urls(limit=1):
     with next(get_db()) as db:  # Get a new database session using a context manager
         top_urls = (db.query(RequestLog.url, func.count(RequestLog.url).label('count'))
                     .filter(RequestLog.result == 'Malicious request')
