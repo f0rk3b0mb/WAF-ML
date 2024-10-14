@@ -1,5 +1,5 @@
 # routes.py
-from flask import Blueprint, render_template, redirect, url_for, request, session
+from flask import Blueprint, render_template, redirect, url_for, request, session, send_file
 from utils import login_required, admin_required
 import datetime
 from data_fetch import (
@@ -11,6 +11,8 @@ from data_fetch import (
 from database import get_db, User  # Import your models and get_db
 from sqlalchemy.orm import Session  # Import Session for typing
 from werkzeug.security import check_password_hash, generate_password_hash
+from visualizations import visualize_blocked_ips, visualize_logs
+
 
 web = Blueprint('web', __name__)
 
@@ -130,3 +132,22 @@ def manage_users():
 
     return render_template("users.html", users=users)
 
+
+
+@web.route('/visualize')
+def visualize():
+    # Get the filter type from the query parameters, defaulting to 'day'
+    filter_type = request.args.get('filter', 'day')
+
+    # Validate the filter type to ensure it is one of the allowed values
+    allowed_filters = ['hour', 'day', 'week']
+    if filter_type not in allowed_filters:
+        filter_type = 'day'  # Reset to default if invalid
+
+    # Generate visualizations
+    log_img = visualize_logs(filter_type=filter_type)
+    blocked_ip_img = visualize_blocked_ips(filter_type=filter_type)
+
+    return render_template('visualize.html', 
+                           log_img=log_img, 
+                           blocked_ip_img=blocked_ip_img)

@@ -5,6 +5,7 @@ import datetime
 
 # Define the database URL
 DATABASE_URL = 'mysql+mysqlconnector://root:57071246@localhost/test'
+#DATABASE_URL = "mysql://user:password@db:3306/mydb"
 
 # Create a new SQLAlchemy engine
 engine = create_engine(DATABASE_URL, echo=True)

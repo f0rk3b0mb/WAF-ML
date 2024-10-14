@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Data Visualizations{% endblock %}
+
+{% block content %}
+    <form class="mb-4" method="GET" action="/visualize">
+        <div class="form-group">
+            <label for="filterSelect">Select Filter:</label>
+            <select class="form-control" id="filterSelect" name="filter">
+                <option value="hour" {% if request.args.get('filter') == 'hour' %}selected{% endif %}>Hourly</option>
+                <option value="day" {% if request.args.get('filter') == 'day' %}selected{% endif %}>Daily</option>
+                <option value="week" {% if request.args.get('filter') == 'week' %}selected{% endif %}>Weekly</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Apply Filter</button>
+    </form>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2>Access Logs</h2>
+                </div>
+                <div class="card-body text-center">
+                    {% if log_img %}
+                        <img src="data:image/png;base64,{{ log_img | b64encode }}" alt="Access Logs" class="img-fluid">
+                    {% else %}
+                        <p>No data to visualize.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2>Blocked IPs</h2>
+                </div>
+                <div class="card-body text-center">
+                    {% if blocked_ip_img %}
+                        <img src="data:image/png;base64,{{ blocked_ip_img | b64encode }}" alt="Blocked IPs" class="img-fluid">
+                    {% else %}
+                        <p>No data to visualize.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
@@ -6,6 +6,8 @@ import os
 
 # Database connection
 DATABASE_URL = 'mysql+mysqlconnector://root:57071246@localhost/test'
+#DATABASE_URL = "mysql://user:password@db:3306/mydb"
+
 engine = create_engine(DATABASE_URL, echo=True)
 Base = declarative_base()
 Session = sessionmaker(bind=engine)
@@ -64,34 +66,45 @@ def add_blocked_ip(ip):
     finally:
         session.close()
 
-# Function to log a request
-#def log_request(ip, url, action):
-#    session = Session()
-#    try:
-#        new_log = RequestLog(ip_address=ip, url=url, action=action)
-#        session.add(new_log)
-#        session.commit()
-#        print(f"Request logged: {url} from {ip}")
-#    except Exception as e:
-#        session.rollback()  # Rollback in case of error
-#        print(f"Error logging request {url} from {ip}: {e}")
-#    finally:
-#        session.close()
+def log_request(ip, url, action):
+    # Log requests to a file instead of the database
+    log_file_path = "logs/access_logs.csv"
 
-def log_request(ip, url, action): # log requests to a file instead of database
+    # Ensure logs directory and file exist
+    os.makedirs("logs", exist_ok=True)
+    if not os.path.exists(log_file_path):
+        with open(log_file_path, "w") as f:
+            f.write("timestamp,ip,url,action\n")  # Write header if new file
+
+    # Write log entry to file
     try:
-        os.mkdir("./logs")
-        open("logs/access_logs.csv", "x").close()
-    except:
-        print("")
-    try:
-        with open("logs/access_logs.csv", "a") as f:
-            log= str(datetime.datetime.now()) + "  ,  " + str(ip) + "  ,  "+ str(url) +"  ,  "+ str(action) + "\n"
+        log = f"{datetime.datetime.now()}, {ip}, {url}, {action}\n"
+        with open(log_file_path, "a") as f:
             f.write(log)
-            print(log.strip(","))
-            f.close()
+            print(log.strip())
     except Exception as e:
-        print(e)
+        print(f"Error writing to log file: {e}")
+
+    # Log requests to the database
+    session = Session()
+    try:
+        new_log = RequestLog(ip_address=ip, url=url, action=action)
+        session.add(new_log)
+
+        # Purge old records if more than 50
+        count = session.query(func.count(RequestLog.id)).scalar()  # Assuming id is the primary key
+        if count > 50:
+            oldest_logs = session.query(RequestLog).order_by(RequestLog.timestamp).limit(count - 50).all()
+            for log in oldest_logs:
+                session.delete(log)
+
+        session.commit()
+        print(f"Request logged in database: {url} from {ip}")
+    except Exception as e:
+        session.rollback()  # Rollback in case of error
+        print(f"Error logging request {url} from {ip}: {e}")
+    finally:
+        session.close()
 
 
 

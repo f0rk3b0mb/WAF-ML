@@ -9,6 +9,8 @@ import time
 import pickle
 import html
 import joblib
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 
@@ -55,6 +57,7 @@ class WAF(object):
         
         # Make predictions
         res = self.lgs.predict(X_predict)
+
         
         # Create a list of results with query and classification
         res_list = []
@@ -86,7 +89,7 @@ class WAF(object):
         for i in range(len(tempQuery) - 3):
             ngrams.append(tempQuery[i:i + 3])
         return ngrams
-
+    
 
 ######################################################################
 
