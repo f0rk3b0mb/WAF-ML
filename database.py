@@ -14,12 +14,23 @@ class Request(Base):
     id = Column(Integer, primary_key=True, index=True)
     url = Column(String, index=True)
     method = Column(String)
+    ip_address = Column(String, nullable=True, index=True)
     headers = Column(Text)
     body = Column(Text)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
+class Blocked(Base):
+    __tablename__ = 'blocked'
+
+    id = Column(Integer, primary_key=True, index=True)
+    ip_address = Column(String, nullable=True, index=True)
+    url = Column(String, nullable=True, index=True)
+    reason = Column(Text, nullable=True)  # Reason for blocking
+    blocked_at = Column(DateTime, default=datetime.utcnow) 
+    status = Column(String, default="blocked")
+
 # Database URL (SQLite in this case)
-DATABASE_URL = "sqlite+aiosqlite:///./requests.db"  # Using a file-based SQLite database
+DATABASE_URL = "sqlite+aiosqlite:///./instance/requests.db"  # Using a file-based SQLite database
 
 # Create an asynchronous engine (for async database operations)
 engine = create_async_engine(DATABASE_URL, echo=True)

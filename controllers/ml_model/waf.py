@@ -74,7 +74,7 @@ class WAF(object):
     # Read queries from a file and return them as a list
     def get_query_list(self, filename):
         directory = str(os.getcwd())
-        filepath = directory + "\\" + filename
+        filepath = directory + "/controllers/api/ml_model/" + filename
         data = open(filepath, 'r').readlines()
         query_list = []
         for d in data:
@@ -90,7 +90,13 @@ class WAF(object):
             ngrams.append(tempQuery[i:i + 3])
         return ngrams
 
-
+def waf_model_predict(url):
+    directory = str(os.getcwd())
+    filepath = directory + "/controllers/ml_model/" + "lgs.pickle"
+    with open(filepath,'rb') as input:
+        w = joblib.load(filepath)
+    result = w.predict(url)
+    return result
 
 
 ######################################################################
@@ -102,12 +108,15 @@ class WAF(object):
 
 if __name__ == '__main__':
     # If the detection model file 'lgs.pickle' does not exist, train the model first
-    w = WAF()
-    with open('lgs.pickle','wb') as output:
-        joblib.dump(w, 'lgs.pickle')
+#    w = WAF()
+#    with open('lgs.pickle','wb') as output:
+#        joblib.dump(w, 'lgs.pickle')
 #   
 #
 #    # Example predictions on new queries
+    with open('lgs.pickle','rb') as input:
+        w = joblib.load('lgs.pickle')
+    print(str(os.getcwd()))
     w.predict(['www.foo.com/id=1<script>alert(1)</script>',
                'www.foo.com/name=admin\' or 1=1',
                'abc.com/admin.php',

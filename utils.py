@@ -1,5 +1,4 @@
 import subprocess
-from database import add_blocked_ip
 
 
 
@@ -10,7 +9,6 @@ def block_ip(ip):
         print(f"Blocked IP: {ip}")
 
         # Log the blocked IP to the database
-        add_blocked_ip(ip)
 
         print(f"Logged blocked IP: {ip} to the database")
 

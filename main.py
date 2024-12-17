@@ -4,6 +4,7 @@ from controllers.proxy.proxy import start_proxy  # Import the proxy server
 from controllers.api.firewall import app  # Import FastAPI app from fastapi_server.py
 from database import init_db
 import asyncio
+from controllers.ml_model.waf import WAF
 
 async def start_fastapi():
     # Run the FastAPI server in the background using Uvicorn
@@ -20,5 +21,5 @@ async def main():
     await asyncio.gather(proxy_task, fastapi_task)
 
 if __name__ == "__main__":
-    #asyncio.run(init_db())
+    asyncio.run(init_db())
     asyncio.run(main())
