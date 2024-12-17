@@ -23,10 +23,10 @@
         <div class="collapse navbar-collapse">
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('web.login') }}">Login</a>
+                    <a class="nav-link" href="{{ url_for('login') }}">Login</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('web.register') }}">Register</a>
+                    <a class="nav-link" href="{{ url_for('register') }}">Register</a>
                 </li>
             </ul>
         </div>
@@ -36,8 +36,8 @@
         <h1>Welcome to MyApp!</h1>
         <p>Join us and explore the app.</p>
         <div>
-            <a href="{{ url_for('web.login') }}" class="btn btn-primary btn-lg">Login</a>
-            <a href="{{ url_for('web.register') }}" class="btn btn-secondary btn-lg">Register</a>
+            <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Login</a>
+            <a href="{{ url_for('register') }}" class="btn btn-secondary btn-lg">Register</a>
         </div>
     </div>
 

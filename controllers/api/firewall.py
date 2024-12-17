@@ -109,18 +109,25 @@ async def get_blocked():
 @app.put("/unblock-ip/{ip_address}")
 async def unblock_ip_endpoint(ip_address: str):
     async with SessionLocal() as db_session:
-        # Step 1: Check if the IP is in the "blocked" list
+        # Step 1: Query all rows with the given IP address
         result = await db_session.execute(select(Blocked).filter(Blocked.ip_address == ip_address))
-        blocked_ip = result.scalars().first()
+        blocked_ips = result.scalars().all()
 
-        if not blocked_ip:
+        if not blocked_ips:
             raise HTTPException(status_code=404, detail="IP address not found in blocked list")
 
-        # Step 2: Update the status to "unblocked"
-        if blocked_ip.status == "unblocked":
-            raise HTTPException(status_code=400, detail="IP address is already unblocked")
+        # Step 2: Update the status to "unblocked" for all matching rows
+        already_unblocked = True  # To track if all rows are already unblocked
 
-        blocked_ip.status = "unblocked"
+        for blocked_ip in blocked_ips:
+            if blocked_ip.status != "unblocked":
+                blocked_ip.status = "unblocked"
+                already_unblocked = False
+
+        if already_unblocked:
+            raise HTTPException(status_code=400, detail="IP address is already unblocked in all rows")
+
+        # Step 3: Commit the changes
         await db_session.commit()
 
-        return {"message": f"IP address {ip_address} has been unblocked successfully."}
+        return {"message": f"All rows with IP address {ip_address} have been unblocked successfully."}
