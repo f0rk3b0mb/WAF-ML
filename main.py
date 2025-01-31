@@ -28,6 +28,6 @@ async def main():
     await asyncio.gather(proxy_task, fastapi_task)
 
 if __name__ == "__main__":
-    asyncio.run(init_db())  # Initialize database (if async)
+    init_db()  # Initialize database (if async)
     asyncio.run(main())  # Run both FastAPI and proxy concurrently
 

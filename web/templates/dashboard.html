@@ -1,63 +1,216 @@
-{% extends "base.html" %}
-
-{% block title %}Dashboard{% endblock %}
-
-{% block content %}
-<div class="row">
-    <div class="col-md-6">
-        <h2>Traffic Overview</h2>
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Total Requests</h5>
-                <p class="card-text">{{ total_requests }}</p>
-            </div>
-        </div>
-        <div class="card mt-2">
-            <div class="card-body">
-                <h5 class="card-title">Blocked Requests</h5>
-                <p class="card-text">{{ blocked_requests }}</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <h2>Threat Detection</h2>
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Top Malicious URLs</h5>
-                <ul class="list-group">
-                    {% for url in top_malicious_urls %}
-                        <li class="list-group-item">{{ url }}</li>
-                    {% endfor %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Dashboard</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .stat-card {
+            transition: transform 0.2s;
+            min-height: 150px;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .chart-container {
+            height: 400px;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Dashboard</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto"> <!-- 'ms-auto' is used to align items to the right -->
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/reports">Reports</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/about">About</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/logout">Help</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/logout">Logout</a>
+                    </li>
                 </ul>
             </div>
         </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row g-4">
+            <!-- Stats Cards -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card stat-card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Requests</h5>
+                        <h2 class="card-text" id="total-requests">Loading...</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card stat-card bg-danger text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Blocked IPs</h5>
+                        <h2 class="card-text" id="total-blocked">Loading...</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row mt-4 g-4">
+            <div class="col-12 col-lg-8">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">Requests Over Time</h5>
+                        <div class="chart-container">
+                            <canvas id="requestsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tables Row -->
+        <div class="row mt-4 g-4">
+            <div class="col-12 col-lg-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">Recent Requests</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>URL</th>
+                                        <th>Method</th>
+                                        <th>IP Address</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-requests">
+                                    <!-- Rows will be inserted here dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">Blocked IPs</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>IP Address</th>
+                                        <th>Blocked At</th>
+                                        <th>Reason</th>
+                                        <th>URL</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="blocked-ips">
+                                    <!-- Rows will be inserted here dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
-<div class="row mt-4">
-    <div class="col-md-12">
-        <h2>Recent Attacks</h2>
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Source IP</th>
-                    <th>URL</th>
-                    <th>Type of Attack</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for attack in recent_attacks %}
-                    <tr>
-                        <td>{{ attack.timestamp }}</td>
-                        <td>{{ attack.ip_address }}</td>
-                        <td>{{ attack.url }}</td>
-                        <td>{{ attack.attack_type }}</td>
-                        <td>{{ attack.action }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endblock %}
+
+    <!-- Bootstrap JS and Popper.js -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Fetch the statistics from FastAPI
+        async function fetchStats() {
+            const totalRequests = await fetch("http://127.0.0.1:8000/get-requests");
+            const totalBlocked = await fetch("http://127.0.0.1:8000/get-blocked");
+            //const totalUsers = await fetch("http://127.0.0.1:8000/get-users");
+            
+            const totalRequestsData = await totalRequests.json();
+            const totalBlockedData = await totalBlocked.json();
+            //const totalUsersData = await totalUsers.json();
+
+            // Insert the data into the stats cards
+            document.getElementById('total-requests').textContent = totalRequestsData.length;
+            document.getElementById('total-blocked').textContent = totalBlockedData.length;
+            //document.getElementById('total-users').textContent = totalUsersData.length;
+
+            // Insert the data into the tables
+            const recentRequestsTable = document.getElementById('recent-requests');
+            totalRequestsData.slice(0, 5).forEach(request => {
+                const row = document.createElement('tr');
+                row.innerHTML = ` 
+                    <td>${new Date(request.timestamp).toLocaleString()}</td>
+                    <td>${request.url.substring(0, 30)}</td>
+                    <td><span class="badge bg-primary">${request.method}</span></td>
+                    <td>${request.ip_address}</td>
+                `;
+                recentRequestsTable.appendChild(row);
+            });
+
+            const blockedIpsTable = document.getElementById('blocked-ips');
+            totalBlockedData.slice(0, 5).forEach(blocked => {
+                const row = document.createElement('tr');
+                row.innerHTML = ` 
+                    <td>${blocked.ip_address}</td>
+                    <td>${new Date(blocked.blocked_at).toLocaleString()}</td>
+                    <td><span class="badge bg-danger">${blocked.reason || 'N/A'}</span></td>
+                    <td>${blocked.url.substring(0, 30)}</td>
+                `;
+                blockedIpsTable.appendChild(row);
+            });
+
+            // Populate the chart with the request data
+            const ctx = document.getElementById('requestsChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: totalRequestsData.map(req => new Date(req.timestamp).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Requests Over Time',
+                        data: totalRequestsData.map(req => req.id), // You can customize the data here
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.2)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.1)' }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Load the stats when the page loads
+        window.onload = fetchStats;
+    </script>
+</body>
+</html>
