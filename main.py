@@ -10,7 +10,7 @@ from web.web import run_flask  # Your Flask app
 # Function to run FastAPI using Uvicorn in the background
 async def start_fastapi():
     # Configure and run the FastAPI server using Uvicorn
-    config = uvicorn.Config("controllers.api.firewall:app", host="0.0.0.0", port=8000, reload=True)
+    config = uvicorn.Config("controllers.api.firewall:app", host="127.0.0.1", port=8000, reload=True)
     server = uvicorn.Server(config)
     await server.serve()
 

@@ -142,8 +142,8 @@
     <script>
         // Fetch the statistics from FastAPI
         async function fetchStats() {
-            const totalRequests = await fetch("http://127.0.0.1:8000/get-requests");
-            const totalBlocked = await fetch("http://127.0.0.1:8000/get-blocked");
+            const totalRequests = await fetch("/requests");
+            const totalBlocked = await fetch("/blocked");
             //const totalUsers = await fetch("http://127.0.0.1:8000/get-users");
             
             const totalRequestsData = await totalRequests.json();

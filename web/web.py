@@ -5,6 +5,8 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from database import User, engine  # Import User model and engine
 from sqlalchemy import select  # Required for querying the database
 import base64
+import requests
+
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -107,6 +109,18 @@ def dashboard():
     if not session.get("user_id"):
         return redirect(url_for("login"))
     return render_template("dashboard.html", username=session.get("username"))
+
+
+@app.route("/blocked")
+def b():
+    r = requests.get("http://127.0.0.1:8000/get-blocked")
+    return r.json()
+
+@app.route("/requests")
+def r():
+    r = requests.get("http://127.0.0.1:8000/get-requests")
+    return r.json()
+
 
 def run_flask():
     app.run("0.0.0.0", 1234)
