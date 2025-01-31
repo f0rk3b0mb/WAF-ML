@@ -13,12 +13,33 @@
             transition: transform 0.2s;
             min-height: 150px;
         }
+
         .stat-card:hover {
             transform: translateY(-5px);
         }
+
         .chart-container {
             height: 400px;
             padding: 20px;
+        }
+
+        .fullscreen-table {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            z-index: 9999;
+            overflow: auto;
+            padding: 20px;
+        }
+
+        .fullscreen-table-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -30,22 +51,12 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto"> <!-- 'ms-auto' is used to align items to the right -->
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/dashboard">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/reports">Reports</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/about">About</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/logout">Help</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/logout">Logout</a>
-                    </li>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link active" href="/dashboard">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/reports">Reports</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/about">About</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/logout">Help</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/logout">Logout</a></li>
                 </ul>
             </div>
         </div>
@@ -53,7 +64,6 @@
 
     <div class="container-fluid mt-4">
         <div class="row g-4">
-            <!-- Stats Cards -->
             <div class="col-12 col-sm-6 col-xl-3">
                 <div class="card stat-card bg-primary text-white">
                     <div class="card-body">
@@ -72,28 +82,13 @@
             </div>
         </div>
 
-        <!-- Charts Row -->
-        <div class="row mt-4 g-4">
-            <div class="col-12 col-lg-8">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <h5 class="card-title">Requests Over Time</h5>
-                        <div class="chart-container">
-                            <canvas id="requestsChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tables Row -->
         <div class="row mt-4 g-4">
             <div class="col-12 col-lg-6">
                 <div class="card shadow">
                     <div class="card-body">
                         <h5 class="card-title">Recent Requests</h5>
                         <div class="table-responsive">
-                            <table class="table table-hover table-striped">
+                            <table class="table table-hover table-striped clickable-table" id="recent-requests-table">
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Timestamp</th>
@@ -116,7 +111,7 @@
                     <div class="card-body">
                         <h5 class="card-title">Blocked IPs</h5>
                         <div class="table-responsive">
-                            <table class="table table-hover table-striped">
+                            <table class="table table-hover table-striped clickable-table" id="blocked-ips-table">
                                 <thead class="table-dark">
                                     <tr>
                                         <th>IP Address</th>
@@ -134,83 +129,125 @@
                 </div>
             </div>
         </div>
+
+        <div class="row mt-4 g-4">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">Requests Over Time</h5>
+                        <div class="chart-container">
+                            <canvas id="requestsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Bootstrap JS and Popper.js -->
+    <div id="fullscreen-table" class="fullscreen-table d-none">
+        <button class="btn btn-danger fullscreen-table-close">Close</button>
+        <div id="fullscreen-table-content"></div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <script>
-        // Fetch the statistics from FastAPI
         async function fetchStats() {
-            const totalRequests = await fetch("/requests");
-            const totalBlocked = await fetch("/blocked");
-            //const totalUsers = await fetch("http://127.0.0.1:8000/get-users");
-            
-            const totalRequestsData = await totalRequests.json();
-            const totalBlockedData = await totalBlocked.json();
-            //const totalUsersData = await totalUsers.json();
+            try {
+                const totalRequests = await fetch("/requests");
+                const totalBlocked = await fetch("/blocked");
 
-            // Insert the data into the stats cards
-            document.getElementById('total-requests').textContent = totalRequestsData.length;
-            document.getElementById('total-blocked').textContent = totalBlockedData.length;
-            //document.getElementById('total-users').textContent = totalUsersData.length;
+                const totalRequestsData = await totalRequests.json();
+                const totalBlockedData = await totalBlocked.json();
 
-            // Insert the data into the tables
-            const recentRequestsTable = document.getElementById('recent-requests');
-            totalRequestsData.slice(0, 5).forEach(request => {
-                const row = document.createElement('tr');
-                row.innerHTML = ` 
-                    <td>${new Date(request.timestamp).toLocaleString()}</td>
-                    <td>${request.url.substring(0, 30)}</td>
-                    <td><span class="badge bg-primary">${request.method}</span></td>
-                    <td>${request.ip_address}</td>
-                `;
-                recentRequestsTable.appendChild(row);
-            });
+                document.getElementById('total-requests').textContent = totalRequestsData.length;
+                document.getElementById('total-blocked').textContent = totalBlockedData.length;
 
-            const blockedIpsTable = document.getElementById('blocked-ips');
-            totalBlockedData.slice(0, 5).forEach(blocked => {
-                const row = document.createElement('tr');
-                row.innerHTML = ` 
-                    <td>${blocked.ip_address}</td>
-                    <td>${new Date(blocked.blocked_at).toLocaleString()}</td>
-                    <td><span class="badge bg-danger">${blocked.reason || 'N/A'}</span></td>
-                    <td>${blocked.url.substring(0, 30)}</td>
-                `;
-                blockedIpsTable.appendChild(row);
-            });
+                const recentRequestsTable = document.getElementById('recent-requests');
+                recentRequestsTable.innerHTML = "";
+                totalRequestsData.slice(-10).reverse().forEach(request => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${new Date(request.timestamp).toLocaleString()}</td>
+                        <td>${request.url.substring(0, 30)}</td>
+                        <td><span class="badge bg-primary">${request.method}</span></td>
+                        <td>${request.ip_address}</td>
+                    `;
+                    recentRequestsTable.appendChild(row);
+                });
 
-            // Populate the chart with the request data
-            const ctx = document.getElementById('requestsChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: totalRequestsData.map(req => new Date(req.timestamp).toLocaleDateString()),
-                    datasets: [{
-                        label: 'Requests Over Time',
-                        data: totalRequestsData.map(req => req.id), // You can customize the data here
-                        borderColor: '#0d6efd',
-                        backgroundColor: 'rgba(13, 110, 253, 0.2)',
-                        fill: true,
-                        tension: 0.3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: 'rgba(0,0,0,0.1)' }
-                        },
-                        x: { grid: { display: false } }
+                const blockedIpsTable = document.getElementById('blocked-ips');
+                blockedIpsTable.innerHTML = "";
+                totalBlockedData.slice(-10).reverse().forEach(blocked => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${blocked.ip_address}</td>
+                        <td>${new Date(blocked.blocked_at).toLocaleString()}</td>
+                        <td><span class="badge bg-danger">${blocked.reason || 'N/A'}</span></td>
+                        <td>${blocked.url.substring(0, 30)}</td>
+                    `;
+                    blockedIpsTable.appendChild(row);
+                });
+
+                const groupedRequests = totalRequestsData.reduce((acc, req) => {
+                    const dateKey = new Date(req.timestamp).toLocaleDateString();
+                    acc[dateKey] = (acc[dateKey] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const ctx = document.getElementById('requestsChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(groupedRequests),
+                        datasets: [{
+                            label: 'Requests Over Time',
+                            data: Object.values(groupedRequests),
+                            backgroundColor: 'rgba(13, 110, 253, 0.5)',
+                            borderColor: '#0d6efd',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0,0,0,0.1)' }
+                            },
+                            x: { grid: { display: false } }
+                        }
                     }
-                }
+                });
+            } catch (error) {
+                console.error("Failed to fetch data: ", error);
+            }
+        }
+
+        function setupTableClickEvents() {
+            document.querySelectorAll('.clickable-table').forEach(table => {
+                table.addEventListener('click', function () {
+                    const clonedTable = table.cloneNode(true);
+                    const fullscreenTable = document.getElementById('fullscreen-table');
+                    const contentContainer = document.getElementById('fullscreen-table-content');
+
+                    contentContainer.innerHTML = "";
+                    contentContainer.appendChild(clonedTable);
+                    fullscreenTable.classList.remove('d-none');
+                });
+            });
+
+            document.querySelector('.fullscreen-table-close').addEventListener('click', function () {
+                document.getElementById('fullscreen-table').classList.add('d-none');
             });
         }
 
-        // Load the stats when the page loads
-        window.onload = fetchStats;
+        window.onload = () => {
+            fetchStats();
+            setupTableClickEvents();
+            setInterval(fetchStats, 5000); // Update every 5 seconds
+        };
     </script>
 </body>
 </html>
