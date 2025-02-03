@@ -1,36 +1,37 @@
 version: '3.8'
 
 services:
-  web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-    ports:
-      - "1234:1234"
-    environment:
-      - APP_ENV=production
-    depends_on:
-      - db
-
   waf:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
+      - "1234:1234"
       - "80:80"
+      - "443:443"
     environment:
       - APP_ENV=production
-    depends_on:
-      - db
-  
-  db:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: mydb
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-    #volumes:
-    #  - db_data:/var/lib/mysql
+#    depends_on:
+#      - db
+
+
+
+  loki:
+    image: grafana/loki:latest
     ports:
-      - "3306:3306"
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+
+
+
+#  db:
+#    image: mysql:8.0
+#    environment:
+#      MYSQL_ROOT_PASSWORD: rootpassword
+#      MYSQL_DATABASE: mydb
+#      MYSQL_USER: user
+#      MYSQL_PASSWORD: password
+#    #volumes:
+#    #  - db_data:/var/lib/mysql
+#    ports:
+#      - "3306:3306"

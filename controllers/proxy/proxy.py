@@ -1,6 +1,7 @@
 import asyncio
 import aiohttp
 from urllib.parse import urlparse
+import time
 
 class ProxyHandler:
     def __init__(self, reader, writer, fastapi_url="http://127.0.0.1:8000"):
@@ -222,6 +223,20 @@ class ProxyHandler:
                         print(f"Failed to log request data: {response.status}")
             except Exception as e:
                 print(f"Error logging request data: {e}")
+    
+    async def log_request_to_loki(self, message, label="proxy_event"):
+        loki_url = "http://localhost:3100/loki/api/v1/push"
+        log_entry = {
+            "streams": [
+                {
+                    "stream": {"service": label},
+                    "values": [[str(int(time.time() * 1e9)), message]]
+                }
+            ]
+        }
+        headers = {"Content-Type": "application/json"}
+        async with aiohttp.ClientSession() as session:
+            await session.post(loki_url, headers=headers, json=log_entry)
 
 class ProxyServer:
     def __init__(self, host='0.0.0.0', port=8080):

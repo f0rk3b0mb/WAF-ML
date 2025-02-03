@@ -5,10 +5,13 @@ from datetime import datetime
 from database import SessionLocal, Request, Blocked, User, init_db
 from controllers.ml_model.waf import waf_model_predict
 from starlette.middleware.cors import CORSMiddleware
+import requests
+import time
+import json
 
 app = FastAPI()
 
-
+LOKI_URL = "http://localhost:3100/loki/api/v1/push" #  add to env
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,24 +30,41 @@ class RequestData(BaseModel):
     ip_address: str  # Ensure IP address is mandatory for logging
 
 
-# Function to store request data into the "requests" table
-def store_request_data(db_session: Session, data: RequestData):
+
+def send_log_to_loki(message, label="waf_event"):
+    log_entry = {
+        "streams": [
+            {
+                "stream": {"service": label},
+                "values": [[str(int(time.time() * 1e9)), message]]
+            }
+        ]
+    }
+    headers = {"Content-Type": "application/json"}
+    requests.post(LOKI_URL, headers=headers, data=json.dumps(log_entry))
+
+
+
+
+def store_request_data(db_session, data):
     db_request = Request(
         url=data.url,
         method=data.method,
         headers=data.headers,
         body=data.body,
-        ip_address=data.ip_address,  # Store the client IP here
+        ip_address=data.ip_address,
         timestamp=datetime.utcnow()
     )
     db_session.add(db_request)
     db_session.commit()
     db_session.refresh(db_request)
+
+    # Push request log to Loki
+    send_log_to_loki(f"Stored request from IP: {data.ip_address}, URL: {data.url}")
     return db_request
 
 
-# Function to add an entry to the "blocked" table
-def add_blocked_entry(db_session: Session, url: str = None, ip_address: str = None, reason: str = "Malicious activity detected"):
+def add_blocked_entry(db_session, url=None, ip_address=None, reason="Malicious activity detected"):
     blocked_entry = Blocked(
         ip_address=ip_address,
         url=url,
@@ -54,6 +74,9 @@ def add_blocked_entry(db_session: Session, url: str = None, ip_address: str = No
     db_session.add(blocked_entry)
     db_session.commit()
     db_session.refresh(blocked_entry)
+
+    # Push block event log to Loki
+    send_log_to_loki(f"Blocked IP: {ip_address}, Reason: {reason}", label="block_event")
 
 
 # Endpoint to store requests and log blocked entries for malicious activity

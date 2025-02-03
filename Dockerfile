@@ -15,6 +15,7 @@ RUN chmod +x /start.sh
 
 # Expose ports  for listening
 EXPOSE 80 
+EXPOSE 1234
 EXPOSE 443
 # Start Supervisor to manage processes
 CMD ["/start.sh"]  

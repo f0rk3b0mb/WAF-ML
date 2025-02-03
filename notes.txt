@@ -1,0 +1,6 @@
+*  TODO *
+
+
+- dockerrize application
+- add lgtm container
+- intergrate with lgtm
