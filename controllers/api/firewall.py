@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import datetime
-from database import SessionLocal, Request, Blocked, User, init_db
+from database import SessionLocal, Request, Blocked, User
 from controllers.ml_model.waf import waf_model_predict
 from starlette.middleware.cors import CORSMiddleware
 

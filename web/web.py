@@ -8,7 +8,7 @@ import requests
 
 
 
-app = Flask(__name__,static_folder="templates/assets", template_folder="templates")  
+app = Flask(__name__,static_folder="templates", static_url_path="/")  
 CORS(app,origins="*",supports_credentials=True)
 app.secret_key = "jdfkfkkigkjgjkjg"
 
@@ -16,6 +16,10 @@ app.secret_key = "jdfkfkkigkjgjkjg"
 bcrypt = Bcrypt(app)
 #server_session=Session(app)
 SessionLocal = scoped_session(sessionmaker(bind=engine))
+app.config['SESSION_COOKIE_HTTPONLY'] = False
+
+
+
 
 def get_db():
     db = SessionLocal()
@@ -25,7 +29,13 @@ def get_db():
         db.close()
 
 
-@app.route("/@me")
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+
+@app.route("/api/@me")
 def get_current_user():
     user_id = session.get('user_id')
     db = SessionLocal()
@@ -35,10 +45,10 @@ def get_current_user():
     
     user= db.query(User).filter(User.id == user_id).first()
 
-    return jsonify({"id": user.id, "username": user.username})
+    return jsonify({"id": user.id, "username": user.username , "email": user.email})
 
 
-@app.route("/register", methods=["POST"])
+@app.route("/api/register", methods=["POST"])
 def register():
     db = SessionLocal()
     email = request.form.get("email")
@@ -52,7 +62,7 @@ def register():
     return redirect(url_for('login'))
 
 
-@app.route("/login", methods=["POST"])
+@app.route("/api/login", methods=["POST"])
 def login():
     db = SessionLocal()
     email_or_username = request.form.get("email")
