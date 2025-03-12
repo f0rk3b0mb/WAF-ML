@@ -5,6 +5,7 @@ from database import User , engine
 from flask_cors import CORS , cross_origin
 from sqlalchemy.orm import scoped_session, sessionmaker
 import requests
+import json
 
 
 
@@ -59,7 +60,7 @@ def register():
     db.add(user)
     db.commit()
     db.close()
-    return redirect(url_for('login'))
+    return jsonify({"success": "User created"})
 
 
 @app.route("/api/login", methods=["POST"])
@@ -91,6 +92,42 @@ def req():
     r = requests.get("http://127.0.0.1:8000/get-requests")
     return r.json()
 
+
+
+@app.route("/api/unblock", methods=["POST"])  
+def unblock():
+    ip = request.json
+    
+    
+    if not ip:
+        return jsonify({"error": "No IP provided"}), 400  
+
+    # Forward the request with correct format  
+    r = requests.post("http://127.0.0.1:8000/unblock-ip", data=json.dumps(ip), headers={"Content-Type": "application/json"})
+
+    if r.status_code != 200:  
+        return jsonify({"error": r.json()["detail"]}), 400
+    else:
+        return jsonify({"success": f"Unblocked"})
+
+
+@app.route("/api/block", methods=["POST"])
+def block():
+    ip = request.json
+    if not ip:
+        return jsonify({"error": "No IP provided"}), 400
+    
+    r = requests.post("http://127.0.0.1:8000/block-ip", data=json.dumps(ip), headers={"Content-Type": "application/json"})
+
+    if r.status_code != 200:
+        return jsonify({"error": r.json()["detail"]}), 400
+    else:
+        return jsonify({"success": f"Blocked"})
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return jsonify({"success": "Logged out"})
 
 
 def run_flask():

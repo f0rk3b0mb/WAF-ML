@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from typing import List
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -119,32 +120,87 @@ def get_blocked():
     finally:
         db_session.close()
 
+class IpAddr(BaseModel):
+    ips: List[str]
 
 # Endpoint to unblock an IP address (via URL parameter)
-@app.put("/unblock-ip/{ip_address}")
-def unblock_ip_endpoint(ip_address: str):
+@app.post("/unblock-ip")
+def unblock_ip_endpoint( ip_addresses: IpAddr):
     db_session = SessionLocal()
     try:
-        # Step 1: Query all rows with the given IP address
-        blocked_ips = db_session.query(Blocked).filter(Blocked.ip_address == ip_address).all()
+        if not ip_addresses:
+            raise HTTPException(status_code=400, detail="No IP addresses provided")
+        
+        print(ip_addresses)
+
+        # Step 1: Query all rows matching the given IP addresses
+        blocked_ips = db_session.query(Blocked).filter(Blocked.ip_address.in_(ip_addresses.ips)).all()
 
         if not blocked_ips:
-            raise HTTPException(status_code=404, detail="IP address not found in blocked list")
+            raise HTTPException(status_code=404, detail="No matching IP addresses found in the blocked list")
 
         # Step 2: Update the status to "unblocked" for all matching rows
-        already_unblocked = True  # To track if all rows are already unblocked
+        already_unblocked_ips = []
+        updated_ips = []
 
         for blocked_ip in blocked_ips:
             if blocked_ip.status != "unblocked":
                 blocked_ip.status = "unblocked"
-                already_unblocked = False
+                updated_ips.append(blocked_ip.ip_address)
+            else:
+                already_unblocked_ips.append(blocked_ip.ip_address)
 
-        if already_unblocked:
-            raise HTTPException(status_code=400, detail="IP address is already unblocked in all rows")
+        if not updated_ips:
+            raise HTTPException(status_code=400, detail=f"All provided IPs are already unblocked: {', '.join(already_unblocked_ips)}")
 
         # Step 3: Commit the changes
         db_session.commit()
 
-        return {"message": f"All rows with IP address {ip_address} have been unblocked successfully."}
+        return {
+            "message": f"Successfully unblocked IP addresses: {', '.join(updated_ips)}",
+            "already_unblocked": already_unblocked_ips
+        }
+    finally:
+        db_session.close()
+
+
+
+
+@app.post("/block-ip")
+def unblock_ip_endpoint( ip_addresses: IpAddr):
+    db_session = SessionLocal()
+    try:
+        if not ip_addresses:
+            raise HTTPException(status_code=400, detail="No IP addresses provided")
+        
+        print(ip_addresses)
+
+        # Step 1: Query all rows matching the given IP addresses
+        blocked_ips = db_session.query(Blocked).filter(Blocked.ip_address.in_(ip_addresses.ips)).all()
+
+        if not blocked_ips:
+            raise HTTPException(status_code=404, detail="No matching IP addresses found in the blocked list")
+
+        # Step 2: Update the status to "unblocked" for all matching rows
+        already_unblocked_ips = []
+        updated_ips = []
+
+        for blocked_ip in blocked_ips:
+            if blocked_ip.status == "unblocked":
+                blocked_ip.status = "blocked"
+                updated_ips.append(blocked_ip.ip_address)
+            else:
+                already_unblocked_ips.append(blocked_ip.ip_address)
+
+        if not updated_ips:
+            raise HTTPException(status_code=400, detail=f"All provided IPs are already blocked: {', '.join(already_unblocked_ips)}")
+
+        # Step 3: Commit the changes
+        db_session.commit()
+
+        return {
+            "message": f"Successfully blocked IP addresses: {', '.join(updated_ips)}",
+            "already_unblocked": already_unblocked_ips
+        }
     finally:
         db_session.close()
