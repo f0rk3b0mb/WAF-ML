@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy import Column, Integer, String, DateTime, func, Boolean
 
 DATABASE_URL = "sqlite:///./instance/requests.db"
 
@@ -35,11 +35,12 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     password = Column(String(255), nullable=False)
+    is_admin = Column(Boolean, default=False)
 
 async def add_default_records():
     async with SessionLocal() as session:
          # Create default users
-        default_admin = User(username="admin", password="scrypt:32768:8:1$7Cz857dN4cjl58TX$a36a634311861488eb48d18f3d5c095c0cd70d5dc4f527e17579251456f3beb9480743da4adb48cb1952913860a5c0528d8f6240cb8b98d4557716774b6abce4", email="admin@admin.com")
+        default_admin = User(username="admin", password="scrypt:32768:8:1$7Cz857dN4cjl58TX$a36a634311861488eb48d18f3d5c095c0cd70d5dc4f527e17579251456f3beb9480743da4adb48cb1952913860a5c0528d8f6240cb8b98d4557716774b6abce4", email="admin@admin.com", is_admin=True)
         #default_user = User(username="test", password=, email="test@test.com")
         
         session.add(default_admin)
@@ -49,7 +50,12 @@ async def add_default_records():
 def add_default_records():
     session = SessionLocal()
     try:
-        default_admin = User(username="admin", password="scrypt:32768:8:1$7Cz857dN4cjl58TX$a36a634311861488eb48d18f3d5c095c0cd70d5dc4f527e17579251456f3beb9480743da4adb48cb1952913860a5c0528d8f6240cb8b98d4557716774b6abce4", email="admin@admin.com")
+        default_admin = User(
+            username="admin", 
+            password="scrypt:32768:8:1$7Cz857dN4cjl58TX$a36a634311861488eb48d18f3d5c095c0cd70d5dc4f527e17579251456f3beb9480743da4adb48cb1952913860a5c0528d8f6240cb8b98d4557716774b6abce4", 
+            email="admin@admin.com",
+            is_admin=True
+        )
         session.add(default_admin)
         session.commit()
     except Exception as e:

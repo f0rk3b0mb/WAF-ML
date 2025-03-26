@@ -34,14 +34,17 @@ from io import BytesIO
 from flask import make_response
 from functools import wraps
 from flask import session, redirect, url_for
-from database import User
+from database import User, engine
 import pyotp
+from sqlalchemy.orm import scoped_session, sessionmaker
+from flask import jsonify
 
 
 # encryptor
 #SECRET_KEY = Fernet.generate_key()
 SECRET_KEY = "oGSklXeLBa-OxD4_HQ0yqnlhesuWA1UgTtp1VBDFA1Y="
 cipher_suite = Fernet(SECRET_KEY)
+SessionLocal = scoped_session(sessionmaker(bind=engine))
 
 #login check
 
@@ -49,7 +52,7 @@ def login_required(func):
     @wraps(func)
     def decorated_function(*args, **kwargs):
         if "user_id" not in session:
-            return redirect(url_for("login"))
+            return jsonify({"error": "Unauthorized"}), 401
         return func(*args, **kwargs)
     return decorated_function
 
@@ -60,17 +63,17 @@ def admin_required(func):
         user_id = session.get("user_id")
 
         if user_id is None:
-            return redirect(url_for("login"))
+            return jsonify({"error": "Unauthorized"}), 401
 
-        user = User.query.get(user_id)
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user or not user.is_admin:
+                return "Only admin is allowed to access this page"
+            return func(*args, **kwargs)
+        finally:
+            db.close()
 
-        if not user:
-            return redirect(url_for("login"))
-
-        if session.get("role") != 1:
-            return "Only admin is allowed to access this page"
-
-        return func(*args, **kwargs)
     return decorated_function
 
 def generate_otp():

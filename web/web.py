@@ -49,7 +49,7 @@ def get_current_user():
     
     user= db.query(User).filter(User.id == user_id).first()
 
-    return jsonify({"id": user.id, "username": user.username , "email": user.email})
+    return jsonify({"id": user.id, "username": user.username , "email": user.email, "is_admin": user.is_admin})
 
 
 @app.route("/api/register", methods=["POST"])
@@ -59,7 +59,7 @@ def register():
     username = request.form.get("username")
     password = request.form.get("password")
     password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
-    user = User(email=email, username=username, password=password_hash)
+    user = User(email=email, username=username, password=password_hash, role=0)
     db.add(user)
     db.commit()
     db.close()
@@ -78,13 +78,18 @@ def login():
 
     if user and bcrypt.check_password_hash(user.password, password):
         session['user_id'] = user.id
-        return jsonify({"id": user.id, "username": user.username})
+        return jsonify({
+            "id": user.id, 
+            "username": user.username,
+            "is_admin": user.is_admin
+        })
     else:
         return jsonify({"error": "Unauthorized"}), 401
     
 
 
 @app.route("/api/requests")
+@login_required
 def get_requests():
     db_session = SessionLocal()
     try:
@@ -100,6 +105,7 @@ def get_requests():
         db_session.close()
 
 @app.route("/api/blocked")
+@login_required
 def get_blocked():
     db_session = SessionLocal()
     try:
@@ -117,6 +123,7 @@ def get_blocked():
 
 
 @app.route("/api/unblock", methods=["POST"])
+@login_required
 def unblock():
     db_session = SessionLocal()
     try:
@@ -138,6 +145,7 @@ def unblock():
         db_session.close()
 
 @app.route("/api/block", methods=["POST"])
+@login_required
 def block():
     db_session = SessionLocal()
     try:
@@ -156,6 +164,7 @@ def block():
         db_session.close()
 
 @app.route("/api/report")
+@admin_required
 def report():
     db_session = SessionLocal()
     try:
@@ -236,11 +245,88 @@ def generate_pdf(report_data):
     pdf_buffer.seek(0)
     return pdf_buffer
 
-@app.route("/logout")
+@app.route("/api/logout")
+@login_required
 def logout():
     session.clear()
     return jsonify({"success": "Logged out"})
 
+@app.route("/api/users", methods=["GET"])
+@admin_required
+def get_users():
+    db = SessionLocal()
+    try:
+        users = db.query(User).all()
+        return jsonify([{
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "is_admin" : user.is_admin
+        } for user in users])
+    finally:
+        db.close()
+
+@app.route("/api/users/<int:user_id>", methods=["PUT"])
+@login_required
+def update_user(user_id):
+    db = SessionLocal()
+    try:
+        # Check if user is updating their own profile or is admin
+        current_user_id = session.get('user_id')
+        current_user = db.query(User).filter(User.id == current_user_id).first()
+        
+        if not current_user:
+            return jsonify({"error": "Current user not found"}), 404
+
+        # If user is not admin and trying to update another user's profile
+        if current_user_id != user_id and not current_user.is_admin:
+            return jsonify({"error": "Unauthorized"}), 403
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        data = request.json
+        if "username" in data:
+            user.username = data["username"]
+        if "email" in data:
+            user.email = data["email"]
+        if "password" in data:
+            user.password = bcrypt.generate_password_hash(data["password"]).decode('utf-8')
+        if "is_admin" in data:
+            # Only allow admins to modify admin status
+            if not current_user.is_admin:
+                return jsonify({"error": "Only admins can modify admin status"}), 403
+            user.is_admin = data["is_admin"]
+
+        db.commit()
+        return jsonify({
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "is_admin": user.is_admin
+        })
+    finally:
+        db.close()
+
+@app.route("/api/users/<int:user_id>", methods=["DELETE"])
+@admin_required
+def delete_user(user_id):
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Prevent admin from deleting themselves
+        if user_id == session.get('user_id'):
+            return jsonify({"error": "Cannot delete your own account"}), 400
+
+        db.delete(user)
+        db.commit()
+        return jsonify({"success": "User deleted"})
+    finally:
+        db.close()
 
 def run_flask():
     app.run("0.0.0.0", 1234)
