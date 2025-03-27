@@ -168,19 +168,38 @@ def block():
 def report():
     db_session = SessionLocal()
     try:
-        requests = db_session.query(Request).all()
-        blocked_entries = db_session.query(Blocked).all()
+        # Get date range parameters from query string
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        # Base query for blocked entries
+        blocked_query = db_session.query(Blocked)
+        
+        # Apply date filters if provided
+        if start_date:
+            blocked_query = blocked_query.filter(Blocked.blocked_at >= datetime.strptime(start_date, "%Y-%m-%d"))
+        if end_date:
+            blocked_query = blocked_query.filter(Blocked.blocked_at <= datetime.strptime(end_date, "%Y-%m-%d"))
+        
+        # Get filtered blocked entries
+        blocked_entries = blocked_query.all()
 
         report_data = {
             "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-            "total_requests": len(requests),
+            "date_range": {
+                "start": start_date or "All time",
+                "end": end_date or "All time"
+            },
             "total_blocked": len(blocked_entries),
-            "requests": [
-                { "id": req.id, "ip_address": req.ip_address, "url": req.url, "method": req.method }
-                for req in requests
-            ],
             "blocked_entries": [
-                { "id": blk.id, "ip_address": blk.ip_address, "reason": blk.reason }
+                { 
+                    "id": blk.id, 
+                    "ip_address": blk.ip_address, 
+                    "url": blk.url,
+                    "reason": blk.reason,
+                    "blocked_at": blk.blocked_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    "status": blk.status
+                }
                 for blk in blocked_entries
             ]
         }
@@ -203,40 +222,36 @@ def generate_pdf(report_data):
     c.setFillColor(colors.black)
     c.setFont("Helvetica", 12)
     c.drawString(50, height - 80, f"Generated At: {report_data['generated_at']}")
-    c.setFillColor(colors.green)
-    c.drawString(50, height - 100, f"Total Requests: {report_data['total_requests']}")
+    c.drawString(50, height - 100, f"Date Range: {report_data['date_range']['start']} to {report_data['date_range']['end']}")
     c.setFillColor(colors.red)
-    c.drawString(50, height - 120, f"Total Blocked: {report_data['total_blocked']}")
+    c.drawString(50, height - 120, f"Total Blocked Entries: {report_data['total_blocked']}")
     
     y_position = height - 150
     
-    # Requests Section with color
-    c.setFillColor(colors.darkgreen)
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, y_position, "Requests:")
-    y_position -= 20
-    c.setFillColor(colors.black)
-    c.setFont("Helvetica", 10)
-    for req in report_data['requests'][:10]:  # Limiting to 10 for readability
-        c.drawString(50, y_position, f"ID: {req['id']}, IP: {req['ip_address']}, URL: {req['url']}, Method: {req['method']}")
-        y_position -= 15
-        if y_position < 50:  # Move to next page if needed
-            c.showPage()
-            y_position = height - 50
-            c.setFont("Helvetica", 10)
-    
     # Blocked Entries Section with color
-    y_position -= 20
     c.setFillColor(colors.darkred)
     c.setFont("Helvetica-Bold", 14)
     c.drawString(50, y_position, "Blocked Entries:")
     y_position -= 20
     c.setFillColor(colors.black)
     c.setFont("Helvetica", 10)
-    for blk in report_data['blocked_entries'][:10]:  # Limiting to 10 for readability
-        c.drawString(50, y_position, f"ID: {blk['id']}, IP: {blk['ip_address']}, Reason: {blk['reason']}")
+    
+    for blk in report_data['blocked_entries']:
+        # Draw entry details with improved formatting
+        c.drawString(50, y_position, f"ID: {blk['id']}")
         y_position -= 15
-        if y_position < 50:
+        c.drawString(70, y_position, f"IP Address: {blk['ip_address']}")
+        y_position -= 15
+        c.drawString(70, y_position, f"URL: {blk['url'][:100]}...")  # Truncate long URLs
+        y_position -= 15
+        c.drawString(70, y_position, f"Reason: {blk['reason']}")
+        y_position -= 15
+        c.drawString(70, y_position, f"Blocked At: {blk['blocked_at']}")
+        y_position -= 15
+        c.drawString(70, y_position, f"Status: {blk['status']}")
+        y_position -= 20  # Add extra space between entries
+        
+        if y_position < 50:  # Move to next page if needed
             c.showPage()
             y_position = height - 50
             c.setFont("Helvetica", 10)

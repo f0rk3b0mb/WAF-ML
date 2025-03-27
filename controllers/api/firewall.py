@@ -98,3 +98,13 @@ def store_request(request_data: RequestData):
         raise HTTPException(status_code=500, detail="Failed to store request data")
     finally:
         db_session.close()
+
+
+@app.get("/get-blocked")
+def get_blocked():
+    db_session = SessionLocal()
+    try:
+        result = db_session.query(Blocked).all()
+        return result
+    finally:
+        db_session.close()

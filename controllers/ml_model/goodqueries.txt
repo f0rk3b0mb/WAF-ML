@@ -22,6 +22,7 @@
 /000023204/
 /radio_explorer/
 /jadedem/
+/src/jq/script.js
 /javascript/legacy.swf
 /network-forensics/
 /free-cookies/
