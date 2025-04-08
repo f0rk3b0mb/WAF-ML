@@ -1,9 +1,13 @@
 import asyncio
 import aiohttp
 from urllib.parse import urlparse
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 class ProxyHandler:
-    def __init__(self, reader, writer, fastapi_url="http://127.0.0.1:8000"):
+    def __init__(self, reader, writer, fastapi_url=os.getenv("FASTAPI_URL")):
         self.reader = reader
         self.writer = writer
         self.fastapi_url = fastapi_url
@@ -57,12 +61,9 @@ class ProxyHandler:
 
             # Parse URL
             parsed_url = urlparse(url)
-            #hostname = parsed_url.hostname if parsed_url.hostname else "127.0.0.1"
-            #port = parsed_url.port if parsed_url.port else 80
-            #path = parsed_url.path if parsed_url.path else "/"
 
-            hostname="127.0.0.1"
-            port=9999
+            hostname=os.getenv("HOSTNAME")
+            port=os.getenv("PORT")
             path = parsed_url.path if parsed_url.path else "/"
 
             print(f"Forwarding {method} request to {hostname}:{port}{path}")
@@ -224,7 +225,7 @@ class ProxyHandler:
                 print(f"Error logging request data: {e}")
 
 class ProxyServer:
-    def __init__(self, host='0.0.0.0', port=8080):
+    def __init__(self, host=os.getenv("PROXY_HOST"), port=os.getenv("PROXY_PORT")):
         self.host = host
         self.port = port
 

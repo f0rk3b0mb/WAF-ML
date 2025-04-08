@@ -9,16 +9,19 @@ import io
 from reportlab.lib import colors
 from datetime import datetime
 from utils import login_required , admin_required
+import os
+from dotenv import load_dotenv
+
 
 
 
 app = Flask(__name__,static_folder="templates", static_url_path="/")  
 CORS(app,origins="*",supports_credentials=True)
-app.secret_key = "jdfkfkkigkjgjkjg"
+load_dotenv()
+app.secret_key = os.getenv("SECRET_KEY")
 
 
 bcrypt = Bcrypt(app)
-#server_session=Session(app)
 SessionLocal = scoped_session(sessionmaker(bind=engine))
 app.config['SESSION_COOKIE_HTTPONLY'] = False
 

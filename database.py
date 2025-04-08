@@ -1,9 +1,14 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker , relationship
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, DateTime, func, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, ForeignKey
+import os
+from dotenv import load_dotenv
 
-DATABASE_URL = "sqlite:///./instance/requests.db"
+
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./instance/requests.db")
 
 Base = declarative_base()
 engine = create_engine(DATABASE_URL)
@@ -20,14 +25,20 @@ class Request(Base):
     body = Column(String)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
+    blocked_entry = relationship('Blocked', back_populates='request', uselist=False, cascade='all, delete')
+
 class Blocked(Base):
     __tablename__ = 'blocked'
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer,  primary_key=True ,index=True)
+    request_id = Column(Integer, ForeignKey('requests.id'))
     ip_address = Column(String, index=True)
     url = Column(String, index=True)
     reason = Column(String)
     blocked_at = Column(DateTime(timezone=True), server_default=func.now())
     status = Column(String, default="blocked")
+    
+    request = relationship('Request', back_populates='blocked_entry')
+    
 
 class User(Base):
     __tablename__ = 'users'
@@ -37,22 +48,15 @@ class User(Base):
     password = Column(String(255), nullable=False)
     is_admin = Column(Boolean, default=False)
 
-async def add_default_records():
-    async with SessionLocal() as session:
-         # Create default users
-        default_admin = User(username="admin", password="scrypt:32768:8:1$7Cz857dN4cjl58TX$a36a634311861488eb48d18f3d5c095c0cd70d5dc4f527e17579251456f3beb9480743da4adb48cb1952913860a5c0528d8f6240cb8b98d4557716774b6abce4", email="admin@admin.com", is_admin=True)
-        #default_user = User(username="test", password=, email="test@test.com")
-        
-        session.add(default_admin)
-        #session.add(default_user)
     
 
 def add_default_records():
     session = SessionLocal()
+
     try:
         default_admin = User(
             username="admin", 
-            password="scrypt:32768:8:1$7Cz857dN4cjl58TX$a36a634311861488eb48d18f3d5c095c0cd70d5dc4f527e17579251456f3beb9480743da4adb48cb1952913860a5c0528d8f6240cb8b98d4557716774b6abce4", 
+            password="$2b$12$UAgcgOVhk80bqRGymPLDOe2Ih839rJnKKdqDtuHqD8QqA2ALGGcmG", 
             email="admin@admin.com",
             is_admin=True
         )
@@ -66,7 +70,7 @@ def add_default_records():
 
 
 def init_db():
-    add_default_records()
-    # Create tables if they don't exist
+    #Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    add_default_records()
     print("Database tables created successfully!")
