@@ -52,7 +52,7 @@ def get_current_user():
     
     user= db.query(User).filter(User.id == user_id).first()
 
-    return jsonify({"id": user.id, "username": user.username , "email": user.email, "is_admin": user.is_admin})
+    return jsonify({"id": user.id, "username": user.username , "email": user.email, "is_admin": user.is_admin, "approved": user.active})
 
 
 @app.route("/api/register", methods=["POST"])
@@ -62,7 +62,7 @@ def register():
     username = request.form.get("username")
     password = request.form.get("password")
     password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
-    user = User(email=email, username=username, password=password_hash, role=0)
+    user = User(email=email, username=username, password=password_hash, is_admin=0, active=0)
     db.add(user)
     db.commit()
     db.close()
