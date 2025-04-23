@@ -47,7 +47,10 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=False)
     password = Column(String(255), nullable=False)
     is_admin = Column(Boolean, default=False)
-    active=Column(Boolean, default=False)
+    is_active=Column(Boolean, default=False)
+    is_approved=Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     
 
@@ -60,7 +63,8 @@ def add_default_records():
             password="$2b$12$UAgcgOVhk80bqRGymPLDOe2Ih839rJnKKdqDtuHqD8QqA2ALGGcmG", 
             email="admin@admin.com",
             is_admin=True,
-            active=True
+            is_approved=True,
+            is_active=True
         )
         session.add(default_admin)
         session.commit()
@@ -72,7 +76,7 @@ def add_default_records():
 
 
 def init_db():
-    #Base.metadata.drop_all(bind=engine)
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    #add_default_records()
+    add_default_records()
     print("Database tables created successfully!")

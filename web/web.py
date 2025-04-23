@@ -52,7 +52,7 @@ def get_current_user():
     
     user= db.query(User).filter(User.id == user_id).first()
 
-    return jsonify({"id": user.id, "username": user.username , "email": user.email, "is_admin": user.is_admin, "approved": user.active})
+    return jsonify({"id": user.id, "username": user.username , "email": user.email, "is_admin": user.is_admin, "approved": user.is_approved, "active": user.is_active})
 
 
 @app.route("/api/register", methods=["POST"])
@@ -62,7 +62,7 @@ def register():
     username = request.form.get("username")
     password = request.form.get("password")
     password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
-    user = User(email=email, username=username, password=password_hash, is_admin=0, active=0)
+    user = User(email=email, username=username, password=password_hash, is_admin=0, is_active=0, is_approved=0)
     db.add(user)
     db.commit()
     db.close()
@@ -166,6 +166,25 @@ def block():
     finally:
         db_session.close()
 
+@app.route("/api/approve", methods=["POST"])
+@login_required
+def approve():
+    db_session = SessionLocal()
+    try:
+        email = request.json.get("email")
+        if not email:
+            return jsonify({"error": "No user provided"}), 400
+
+        users = db_session.query(User).filter(User.email == email).all()
+
+        for user in users:
+            user.is_approved = 1
+        
+        db_session.commit()
+        return jsonify({"success": "Approved"})
+    finally:
+        db_session.close()
+
 @app.route("/api/report")
 @admin_required
 def report():
@@ -174,27 +193,55 @@ def report():
         # Get date range parameters from query string
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
-        
-        # Base query for blocked entries
-        blocked_query = db_session.query(Blocked)
-        
-        # Apply date filters if provided
-        if start_date:
-            blocked_query = blocked_query.filter(Blocked.blocked_at >= datetime.strptime(start_date, "%Y-%m-%d"))
-        if end_date:
-            blocked_query = blocked_query.filter(Blocked.blocked_at <= datetime.strptime(end_date, "%Y-%m-%d"))
-        
-        # Get filtered blocked entries
-        blocked_entries = blocked_query.all()
+        report_type = request.args.get('report_type')
 
         report_data = {
             "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
             "date_range": {
                 "start": start_date or "All time",
                 "end": end_date or "All time"
-            },
-            "total_blocked": len(blocked_entries),
-            "blocked_entries": [
+            }
+        }
+
+        if report_type == "requests":
+            # Base query for requests
+            requests_query = db_session.query(Request)
+            
+            # Apply date filters if provided
+            if start_date:
+                requests_query = requests_query.filter(Request.timestamp >= datetime.strptime(start_date, "%Y-%m-%d"))
+            if end_date:
+                requests_query = requests_query.filter(Request.timestamp <= datetime.strptime(end_date, "%Y-%m-%d"))
+            
+            # Get filtered requests
+            requests_entries = requests_query.all()
+
+            report_data["total_requests"] = len(requests_entries)
+            report_data["requests_entries"] = [
+                { 
+                    "id": req.id, 
+                    "ip_address": req.ip_address, 
+                    "url": req.url, 
+                    "method": req.method,
+                    "timestamp": req.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                }
+                for req in requests_entries
+            ]
+            
+        elif report_type == "blocked":
+            # Base query for blocked entries
+            blocked_query = db_session.query(Blocked)
+            
+            # Apply date filters if provided
+            if start_date:
+                blocked_query = blocked_query.filter(Blocked.blocked_at >= datetime.strptime(start_date, "%Y-%m-%d"))
+            if end_date:
+                blocked_query = blocked_query.filter(Blocked.blocked_at <= datetime.strptime(end_date, "%Y-%m-%d"))
+            
+            # Get filtered blocked entries
+            blocked_entries = blocked_query.all()
+
+            report_data["blocked_entries"] = [
                 { 
                     "id": blk.id, 
                     "ip_address": blk.ip_address, 
@@ -205,13 +252,41 @@ def report():
                 }
                 for blk in blocked_entries
             ]
-        }
-        pdf_buffer = generate_pdf(report_data)
+        
+        elif report_type == "users":
+            # Base query for users
+            users_query = db_session.query(User)
+            
+            # Apply date filters if provided
+            if start_date:
+                users_query = users_query.filter(User.created_at >= datetime.strptime(start_date, "%Y-%m-%d"))
+            if end_date:
+                users_query = users_query.filter(User.created_at <= datetime.strptime(end_date, "%Y-%m-%d"))
+            
+            # Get filtered users
+            users_entries = users_query.all()
+
+            report_data["total_users"] = len(users_entries)
+            report_data["users_entries"] = [
+                { 
+                    "id": user.id, 
+                    "username": user.username, 
+                    "email": user.email,
+                    "is_admin": user.is_admin,
+                    "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                }
+                for user in users_entries
+            ]
+        
+        else:
+            return jsonify({"error": "Invalid report type"}), 400
+
+        pdf_buffer = generate_pdf(report_data, report_type)
         return send_file(pdf_buffer, as_attachment=True, download_name="waf_report.pdf", mimetype="application/pdf")
     finally:
         db_session.close()
 
-def generate_pdf(report_data):
+def generate_pdf(report_data, report_type):
     pdf_buffer = io.BytesIO()
     c = canvas.Canvas(pdf_buffer, pagesize=letter)
     width, height = letter
@@ -226,42 +301,80 @@ def generate_pdf(report_data):
     c.setFont("Helvetica", 12)
     c.drawString(50, height - 80, f"Generated At: {report_data['generated_at']}")
     c.drawString(50, height - 100, f"Date Range: {report_data['date_range']['start']} to {report_data['date_range']['end']}")
-    c.setFillColor(colors.red)
-    c.drawString(50, height - 120, f"Total Blocked Entries: {report_data['total_blocked']}")
+
+    y_position = height - 120
     
-    y_position = height - 150
-    
-    # Blocked Entries Section with color
-    c.setFillColor(colors.darkred)
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, y_position, "Blocked Entries:")
-    y_position -= 20
-    c.setFillColor(colors.black)
-    c.setFont("Helvetica", 10)
-    
-    for blk in report_data['blocked_entries']:
-        # Draw entry details with improved formatting
-        c.drawString(50, y_position, f"ID: {blk['id']}")
-        y_position -= 15
-        c.drawString(70, y_position, f"IP Address: {blk['ip_address']}")
-        y_position -= 15
-        c.drawString(70, y_position, f"URL: {blk['url'][:100]}...")  # Truncate long URLs
-        y_position -= 15
-        c.drawString(70, y_position, f"Reason: {blk['reason']}")
-        y_position -= 15
-        c.drawString(70, y_position, f"Blocked At: {blk['blocked_at']}")
-        y_position -= 15
-        c.drawString(70, y_position, f"Status: {blk['status']}")
-        y_position -= 20  # Add extra space between entries
+    if report_type == "requests":
+        c.setFillColor(colors.darkblue)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, y_position, "Requests Entries:")
+        y_position -= 20
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 10)
         
-        if y_position < 50:  # Move to next page if needed
-            c.showPage()
-            y_position = height - 50
-            c.setFont("Helvetica", 10)
-    
+        for req in report_data["requests_entries"]:
+            c.drawString(50, y_position, f"ID: {req['id']}")
+            y_position -= 15
+            c.drawString(70, y_position, f"IP Address: {req['ip_address']}")
+            y_position -= 15
+            c.drawString(70, y_position, f"URL: {req['url'][:100]}...")  # Truncate long URLs
+            y_position -= 15
+            c.drawString(70, y_position, f"Method: {req['method']}")
+            y_position -= 15
+            c.drawString(70, y_position, f"Timestamp: {req['timestamp']}")
+            y_position -= 20
+        
+    elif report_type == "blocked":
+        c.setFillColor(colors.darkred)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, y_position, "Blocked Entries:")
+        y_position -= 20
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 10)
+        
+        for blk in report_data["blocked_entries"]:
+            c.drawString(50, y_position, f"ID: {blk['id']}")
+            y_position -= 15
+            c.drawString(70, y_position, f"IP Address: {blk['ip_address']}")
+            y_position -= 15
+            c.drawString(70, y_position, f"URL: {blk['url'][:100]}...")  # Truncate long URLs
+            y_position -= 15
+            c.drawString(70, y_position, f"Reason: {blk['reason']}")
+            y_position -= 15
+            c.drawString(70, y_position, f"Blocked At: {blk['blocked_at']}")
+            y_position -= 15
+            c.drawString(70, y_position, f"Status: {blk['status']}")
+            y_position -= 20
+        
+    elif report_type == "users":
+        c.setFillColor(colors.green)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, y_position, "User Entries:")
+        y_position -= 20
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 10)
+        
+        for user in report_data["users_entries"]:
+            c.drawString(50, y_position, f"ID: {user['id']}")
+            y_position -= 15
+            c.drawString(70, y_position, f"Username: {user['username']}")
+            y_position -= 15
+            c.drawString(70, y_position, f"Email: {user['email']}")
+            y_position -= 15
+            c.drawString(70, y_position, f"Is Admin: {user['is_admin']}")
+            y_position -= 15
+            c.drawString(70, y_position, f"Created At: {user['created_at']}")
+            y_position -= 20
+
+    if y_position < 50:  # Move to next page if needed
+        c.showPage()
+        y_position = height - 50
+        c.setFont("Helvetica", 10)
+
     c.save()
     pdf_buffer.seek(0)
     return pdf_buffer
+
 
 @app.route("/api/logout")
 @login_required
@@ -279,7 +392,9 @@ def get_users():
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "is_admin" : user.is_admin
+            "is_admin" : user.is_admin,
+            "approved": user.is_approved,
+            "active": user.is_active
         } for user in users])
     finally:
         db.close()
@@ -338,9 +453,10 @@ def delete_user(user_id):
 
         # Prevent admin from deleting themselves
         if user_id == session.get('user_id'):
-            return jsonify({"error": "Cannot delete your own account"}), 400
+            return jsonify({"error": "Cannot arhcive your own account"}), 400
 
-        db.delete(user)
+        #archive user by making them inactive
+        user.active = 0
         db.commit()
         return jsonify({"success": "User deleted"})
     finally:
