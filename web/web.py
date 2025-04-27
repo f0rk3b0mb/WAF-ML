@@ -84,7 +84,9 @@ def login():
         return jsonify({
             "id": user.id, 
             "username": user.username,
-            "is_admin": user.is_admin
+            "is_admin": user.is_admin,
+            "is_approved": user.is_approved,
+            "is_active": user.is_active
         })
     else:
         return jsonify({"error": "Unauthorized"}), 401

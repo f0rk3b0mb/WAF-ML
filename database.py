@@ -76,7 +76,7 @@ def add_default_records():
 
 
 def init_db():
-    Base.metadata.drop_all(bind=engine)
+    #Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    add_default_records()
+    #add_default_records()
     print("Database tables created successfully!")
