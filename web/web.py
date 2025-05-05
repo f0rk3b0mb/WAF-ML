@@ -11,6 +11,7 @@ from datetime import datetime
 from utils import login_required , admin_required
 import os
 from dotenv import load_dotenv
+import json
 
 
 
@@ -62,7 +63,7 @@ def register():
     username = request.form.get("username")
     password = request.form.get("password")
     password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
-    user = User(email=email, username=username, password=password_hash, is_admin=0, is_active=0, is_approved=0)
+    user = User(email=email, username=username, password=password_hash, is_admin=0, is_active=1, is_approved=0)
     db.add(user)
     db.commit()
     db.close()
@@ -444,6 +445,32 @@ def update_user(user_id):
     finally:
         db.close()
 
+
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    data = request.json
+    if not data.get('name') or not data.get('message'):
+        return jsonify({'error': 'Name and message are required'}), 400
+    
+    #create feedback file if it doesn't exist
+    if not os.path.exists("FEEDBACK_FILE.json"):
+        with open("FEEDBACK_FILE.json", 'w') as f:
+            json.dump([], f)
+
+    with open("FEEDBACK_FILE.json", 'r+') as f:
+        feedbacks = json.load(f)
+        feedbacks.append(data)
+        f.seek(0)
+        json.dump(feedbacks, f, indent=2)
+    
+    return jsonify({'message': 'Feedback saved'}), 200
+
+@app.route('/api/feedbacks', methods=['GET'])
+def get_feedbacks():
+    with open("FEEDBACK_FILE.json", 'r') as f:
+        feedbacks = json.load(f)
+    return jsonify(feedbacks), 200
+
 @app.route("/api/users/<int:user_id>", methods=["DELETE"])
 @admin_required
 def delete_user(user_id):
@@ -458,7 +485,7 @@ def delete_user(user_id):
             return jsonify({"error": "Cannot arhcive your own account"}), 400
 
         #archive user by making them inactive
-        user.active = 0
+        user.is_active = 0
         db.commit()
         return jsonify({"success": "User deleted"})
     finally:
