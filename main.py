@@ -1,66 +1,76 @@
-from scapy.all import sniff, TCP, IP, Raw
-import urllib
-import joblib
-from utils import block_ip
-from ML.waf import WAF
-from database import log_request
+import asyncio
+import uvicorn
+import threading
+import signal
+from controllers.proxy.proxy import start_proxy  # Import the proxy server
+from controllers.api.firewall import app as fastapi_app  # Import FastAPI app
+from database import init_db
+from controllers.ml_model.waf import WAF
+from web.web import run_flask  # Your Flask app
 
+# Global variables to track running services
+flask_thread = None
+proxy_task = None
+fastapi_task = None
 
-def extract_url(packet):
-    if packet.haslayer(Raw):  # Check if the packet has a payload
-        try:
-            payload = packet[Raw].load.decode('utf-8', errors='ignore')
+# Function to run FastAPI using Uvicorn in the background
+async def start_fastapi():
+    # Configure and run the FastAPI server using Uvicorn
+    config = uvicorn.Config("controllers.api.firewall:app", host="127.0.0.1", port=8000, reload=True)
+    server = uvicorn.Server(config)
+    await server.serve()
 
-            # Only consider HTTP GET requests
-            if payload.startswith('GET'):
-                # Split payload to get the request line (first line contains the URL)
-                request_line = payload.split('\n')[0]
-                # Extract the URL from the request line
-                url = request_line.split(' ')[1]
+# Function to start Flask in a separate thread
+def start_flask():
+    global flask_thread
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
 
-                # Handle URL encoding
-                url = urllib.parse.unquote(url)  # Decode any URL-encoded characters
-                print(f"Extracted URL: {url}")
-                return url
-        except Exception as e:
-            print(f"Error extracting URL: {e}")
-
-    return None
-
-
-def handle_packet(packet):
-    if packet.haslayer(TCP) and packet.haslayer(IP):
-        source_ip = packet[IP].src
-        destination_ip = packet[IP].dst
-        url = extract_url(packet)
-
-        if url:
-            try:
-                # Make prediction using your WAF's ML model
-                result = w.predict([url])
-                if result[0]['res'] == 'Malicious request':
-                    print(f"Blocked malicious URL: {url} from {source_ip}")
-                    # Implement logic to block the IP or drop the packet (optional)
-                    block_ip(source_ip)
-                    log_request(source_ip, url, result[0]['res'])
-                else:
-                    print(f"Allowed URL: {url} from {source_ip}")
-                    log_request(source_ip, url, result[0]['res'])
-
-            except Exception as e:
-                print(f"Error during prediction: {e}")
-
-
-
-
-
-if __name__ == '__main__':
-    with open('ML/lgs.pickle','rb') as input:
-        w = joblib.load('ML/lgs.pickle')
-    print("Model loaded succesfully :)")
-    print("")
-    print("Waf listening on port 80 ...")
+async def shutdown(signal, loop):
+    """Cleanup tasks tied to the service's shutdown."""
+    print(f"\nReceived exit signal {signal.name}...")
     
-    # Start sniffing HTTP traffic (port 80)
-    sniff(filter="tcp port 1234", prn=handle_packet, store=0,iface=['lo'])
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    [task.cancel() for task in tasks]
+    
+    print(f"Cancelling {len(tasks)} outstanding tasks")
+    await asyncio.gather(*tasks, return_exceptions=True)
+    
+    loop.stop()
+
+async def main():
+    # Get the event loop
+    loop = asyncio.get_running_loop()
+    
+    # Add signal handlers
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(
+            sig,
+            lambda s=sig: asyncio.create_task(shutdown(s, loop))
+        )
+    
+    try:
+        start_flask()  # Start Flask in a separate thread
+        # Run both the proxy and FastAPI server concurrently
+        global proxy_task, fastapi_task
+        proxy_task = asyncio.create_task(start_proxy())  # Start proxy server
+        fastapi_task = asyncio.create_task(start_fastapi())  # Start FastAPI server
+
+        # Wait for both tasks to finish
+        await asyncio.gather(proxy_task, fastapi_task)
+    except asyncio.CancelledError:
+        print("Tasks were cancelled")
+    finally:
+        print("Shutting down gracefully...")
+
+if __name__ == "__main__":
+    try:
+        init_db()  # Initialize database (if async)
+        asyncio.run(main())  # Run both FastAPI and proxy concurrently
+    except KeyboardInterrupt:
+        print("\nReceived keyboard interrupt. Shutting down...")
+    except Exception as e:
+        print(f"\nAn error occurred: {e}")
+    finally:
+        print("Application shutdown complete.")
 

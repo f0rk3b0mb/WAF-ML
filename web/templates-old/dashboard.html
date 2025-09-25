@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Dashboard</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .stat-card {
+            transition: transform 0.2s;
+            min-height: 150px;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .chart-container {
+            height: 400px;
+            padding: 20px;
+        }
+
+        .fullscreen-table {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            z-index: 9999;
+            overflow: auto;
+            padding: 20px;
+        }
+
+        .fullscreen-table-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Dashboard</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link active" href="/dashboard">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/reports">Reports</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/about">About</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/help">Help</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/logout">Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row g-4">
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card stat-card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Requests</h5>
+                        <h2 class="card-text" id="total-requests">Loading...</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card stat-card bg-danger text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Blocked IPs</h5>
+                        <h2 class="card-text" id="total-blocked">Loading...</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4 g-4">
+            <div class="col-12 col-lg-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">Recent Requests</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped clickable-table" id="recent-requests-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>URL</th>
+                                        <th>Method</th>
+                                        <th>IP Address</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-requests">
+                                    <!-- Rows will be inserted here dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">Blocked IPs</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped clickable-table" id="blocked-ips-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>IP Address</th>
+                                        <th>Blocked At</th>
+                                        <th>Reason</th>
+                                        <th>URL</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="blocked-ips">
+                                    <!-- Rows will be inserted here dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4 g-4">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">Requests Over Time</h5>
+                        <div class="chart-container">
+                            <canvas id="requestsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="fullscreen-table" class="fullscreen-table d-none">
+        <button class="btn btn-danger fullscreen-table-close">Close</button>
+        <div id="fullscreen-table-content"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        async function fetchStats() {
+            try {
+                const totalRequests = await fetch("/requests");
+                const totalBlocked = await fetch("/blocked");
+
+                const totalRequestsData = await totalRequests.json();
+                const totalBlockedData = await totalBlocked.json();
+
+                document.getElementById('total-requests').textContent = totalRequestsData.length;
+                document.getElementById('total-blocked').textContent = totalBlockedData.length;
+
+                const recentRequestsTable = document.getElementById('recent-requests');
+                recentRequestsTable.innerHTML = "";
+                totalRequestsData.slice(-10).reverse().forEach(request => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${new Date(request.timestamp).toLocaleString()}</td>
+                        <td>${request.url.substring(0, 30)}</td>
+                        <td><span class="badge bg-primary">${request.method}</span></td>
+                        <td>${request.ip_address}</td>
+                    `;
+                    recentRequestsTable.appendChild(row);
+                });
+
+                const blockedIpsTable = document.getElementById('blocked-ips');
+                blockedIpsTable.innerHTML = "";
+                totalBlockedData.slice(-10).reverse().forEach(blocked => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${blocked.ip_address}</td>
+                        <td>${new Date(blocked.blocked_at).toLocaleString()}</td>
+                        <td><span class="badge bg-danger">${blocked.reason || 'N/A'}</span></td>
+                        <td>${blocked.url.substring(0, 30)}</td>
+                    `;
+                    blockedIpsTable.appendChild(row);
+                });
+
+                const groupedRequests = totalRequestsData.reduce((acc, req) => {
+                    const dateKey = new Date(req.timestamp).toLocaleDateString();
+                    acc[dateKey] = (acc[dateKey] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const ctx = document.getElementById('requestsChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(groupedRequests),
+                        datasets: [{
+                            label: 'Requests Over Time',
+                            data: Object.values(groupedRequests),
+                            backgroundColor: 'rgba(13, 110, 253, 0.5)',
+                            borderColor: '#0d6efd',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0,0,0,0.1)' }
+                            },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to fetch data: ", error);
+            }
+        }
+
+        function setupTableClickEvents() {
+            document.querySelectorAll('.clickable-table').forEach(table => {
+                table.addEventListener('click', function () {
+                    const clonedTable = table.cloneNode(true);
+                    const fullscreenTable = document.getElementById('fullscreen-table');
+                    const contentContainer = document.getElementById('fullscreen-table-content');
+
+                    contentContainer.innerHTML = "";
+                    contentContainer.appendChild(clonedTable);
+                    fullscreenTable.classList.remove('d-none');
+                });
+            });
+
+            document.querySelector('.fullscreen-table-close').addEventListener('click', function () {
+                document.getElementById('fullscreen-table').classList.add('d-none');
+            });
+        }
+
+        window.onload = () => {
+            fetchStats();
+            setupTableClickEvents();
+            setInterval(fetchStats, 5000); // Update every 5 seconds
+        };
+    </script>
+</body>
+</html>
